@@ -1,8 +1,7 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
-import Constants from 'expo-constants';
-
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import Constants from "expo-constants";
 // Firebase config
 const firebaseConfig = {
     apiKey: Constants.expoConfig.extra.apiKey,
@@ -11,16 +10,10 @@ const firebaseConfig = {
     storageBucket: Constants.expoConfig.extra.storageBucket,
     messagingSenderId: Constants.expoConfig.extra.messagingSenderId,
     appId: Constants.expoConfig.extra.appId,
-    databaseURL: Constants.expoConfig.extra.databaseURL
+    databaseURL: Constants.expoConfig.extra.databaseURL,
+
 };
-const app = initializeApp(firebaseConfig);
-
-
-
-const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-
-
-export {
-    db,
-    app
-}; 
+// initialize firebase
+initializeApp(firebaseConfig);
+export const auth = getAuth();
+export const database = getFirestore();

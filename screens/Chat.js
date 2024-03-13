@@ -18,7 +18,7 @@ import { auth, database } from '../config/firebase';
 import { useNavigation } from '@react-navigation/native';
 import { AntDesign } from '@expo/vector-icons';
 import colors from '../colors';
-
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 
 export default function Chat() {
 
@@ -45,7 +45,6 @@ export default function Chat() {
     }, [navigation]);
 
     useLayoutEffect(() => {
-
         const collectionRef = collection(database, 'chats');
         const q = query(collectionRef, orderBy('createdAt', 'desc'));
 
@@ -60,6 +59,7 @@ export default function Chat() {
                 }))
             );
         });
+
         return unsubscribe;
     }, []);
 
@@ -67,7 +67,7 @@ export default function Chat() {
         setMessages(previousMessages =>
             GiftedChat.append(previousMessages, messages)
         );
-        // setMessages([...messages, ...messages]);
+
         const { _id, createdAt, text, user } = messages[0];
         addDoc(collection(database, 'chats'), {
             _id,
@@ -77,8 +77,41 @@ export default function Chat() {
         });
     }, []);
 
-    return (
+    const handleImagePicker = () => {
+        launchImageLibrary({ mediaType: 'photo' }, response => {
+            if (!response.didCancel && !response.errorCode) {
+                const imageMessage = {
+                    _id: Math.round(Math.random() * 1000000),
+                    createdAt: new Date(),
+                    user: {
+                        _id: auth?.currentUser?.email,
+                        avatar: 'https://picsum.photos/id/237/200/300'
+                    },
+                    image: response.uri
+                };
+                onSend([imageMessage]);
+            }
+        });
+    };
 
+    const handleVideoPicker = () => {
+        launchImageLibrary({ mediaType: 'video' }, response => {
+            if (!response.didCancel && !response.errorCode) {
+                const videoMessage = {
+                    _id: Math.round(Math.random() * 1000000),
+                    createdAt: new Date(),
+                    user: {
+                        _id: auth?.currentUser?.email,
+                        avatar: 'https://picsum.photos/id/237/200/300'
+                    },
+                    video: response.uri
+                };
+                onSend([videoMessage]);
+            }
+        });
+    };
+
+    return (
         <GiftedChat
             messages={messages}
             showAvatarForEveryMessage={false}
@@ -95,7 +128,16 @@ export default function Chat() {
                 _id: auth?.currentUser?.email,
                 avatar: 'https://picsum.photos/id/237/200/300'
             }}
+            renderActions={() => (
+                <TouchableOpacity onPress={handleImagePicker}>
+                    <Text>Upload Image</Text>
+                </TouchableOpacity>
+            )}
+            renderComposer={props => (
+                <TouchableOpacity onPress={handleVideoPicker}>
+                    <Text>Upload Video</Text>
+                </TouchableOpacity>
+            )}
         />
     );
 }
-
