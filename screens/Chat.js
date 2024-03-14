@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AntDesign } from '@expo/vector-icons';
 import colors from '../colors';
 import { launchImageLibraryAsync } from 'expo-image-picker';
+import { addMessageToFirestore } from '../config/firebase';
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
@@ -65,19 +66,27 @@ export default function Chat() {
 
 
     // Function to send messages to Firestore
-    const handleSend = useCallback((newMessages = []) => {
-        const formattedMessages = newMessages.map(message => ({
-            ...message,
-            createdAt: message.createdAt.toISOString(),
-        }));
+    const handleSend = useCallback(async (newMessages = []) => {
+        const formattedMessages = newMessages.map(message => {
+            const formattedMessage = {
+                ...message,
+                createdAt: message.createdAt.toISOString(),
+                // Ensure that the image field is properly defined
+                image: message.image || null,
+                // Add any other necessary fields
+            };
+            return formattedMessage;
+        });
 
         setMessages(previousMessages => GiftedChat.append(previousMessages, formattedMessages));
 
-        formattedMessages.forEach(message => {
-            addDoc(collection(database, 'chats'), message)
-                .then(() => console.log('Message added successfully'))
-                .catch(error => console.error('Error adding message: ', error));
-        });
+        try {
+            // Use Promise.all to await all the addDoc promises
+            await Promise.all(formattedMessages.map(message => addMessageToFirestore(message)));
+            console.log('Messages added successfully');
+        } catch (error) {
+            console.error('Error adding messages: ', error);
+        }
     }, []);
 
     // Function to handle image picker
@@ -126,13 +135,44 @@ export default function Chat() {
         }
     };
 
+    // Function to render image messages
+    const renderMessageImage = (props) => {
+        const { currentMessage } = props;
+        if (currentMessage.image) {
+            return (
+                <Image
+                    source={{ uri: currentMessage.image }}
+                    style={{ width: 200, height: 200 }}
+                />
+            );
+        }
+        return null;
+    };
+
+
+    // Function to render video messages
+    const renderMessageVideo = (props) => {
+        const { currentMessage } = props;
+        if (currentMessage.video) {
+            return (
+                <Video
+                    source={{ uri: currentMessage.video }}
+                    style={{ width: 200, height: 200 }}
+                    resizeMode="cover"
+                    useNativeControls
+                />
+            );
+        }
+        return null;
+    };
+
     return (
         <View style={{ flex: 1 }}>
             <GiftedChat
                 messages={messages}
                 onSend={newMessages => handleSend(newMessages)}
-                renderMessageImage={props => <Image source={{ uri: props.currentMessage.image }} style={{ width: 200, height: 200 }} />}
-                renderMessageVideo={props => <Video source={{ uri: props.currentMessage.video }} style={{ width: 200, height: 200 }} resizeMode="cover" useNativeControls />}
+                renderMessageImage={renderMessageImage}
+                renderMessageVideo={renderMessageVideo}
                 user={{
                     _id: auth.currentUser.email,
                     avatar: auth.currentUser.photoURL || 'https://picsum.photos/id/237/200/300',

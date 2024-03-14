@@ -25,7 +25,9 @@ export const storage = getStorage(app);
 // Function to upload image to Firebase Storage
 export const uploadImageToFirebase = async (uri, fileName) => {
     const imageRef = ref(storage, `images/${fileName}`);
-    const uploadTask = uploadBytesResumable(imageRef, uri);
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const uploadTask = uploadBytesResumable(imageRef, blob);
 
     return new Promise((resolve, reject) => {
         uploadTask.on(
@@ -41,6 +43,7 @@ export const uploadImageToFirebase = async (uri, fileName) => {
         );
     });
 };
+
 
 // Function to add a new document to Firestore collection
 export const addMessageToFirestore = async (message) => {
