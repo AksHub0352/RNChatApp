@@ -2,14 +2,15 @@ import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react'
 import { TouchableOpacity, Text, View, Image } from 'react-native';
 import { Video } from 'expo-av';
 import { GiftedChat } from 'react-native-gifted-chat';
-import { collection, addDoc, orderBy, query, onSnapshot } from 'firebase/firestore';
+import { collection, orderBy, query, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, database } from '../config/firebase';
 import { useNavigation } from '@react-navigation/native';
 import { AntDesign } from '@expo/vector-icons';
 import colors from '../colors';
 import { launchImageLibraryAsync } from 'expo-image-picker';
-import { addMessageToFirestore } from '../config/firebase';
+import { addMessageToFirestore, uploadImageToFirebase } from '../config/firebase';
+import ImageResizer from 'react-native-image-resizer';
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
@@ -37,29 +38,29 @@ export default function Chat() {
     }, [navigation]);
 
     useEffect(() => {
-        const collectionRef = collection(database, 'chats');
-        const q = query(collectionRef, orderBy('createdAt', 'desc'));
-
-        const unsubscribe = onSnapshot(q, querySnapshot => {
-            const fetchedMessages = querySnapshot.docs.map(doc => {
-                const data = doc.data();
-                let createdAt = null;
-                try {
-                    createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
-                } catch (error) {
-                    console.error('Error parsing createdAt:', error);
-                }
-                return {
-                    _id: doc.id,
-                    createdAt: createdAt,
-                    text: data.text || '',
-                    user: data.user,
-                    image: data.image || null,
-                    video: data.video || null,
-                };
-            });
-            setMessages(fetchedMessages);
-        });
+        const unsubscribe = onSnapshot(
+            query(collection(database, 'chats'), orderBy('createdAt', 'desc')),
+            querySnapshot => {
+                const fetchedMessages = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    let createdAt = null;
+                    try {
+                        createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
+                    } catch (error) {
+                        console.error('Error parsing createdAt:', error);
+                    }
+                    return {
+                        _id: doc.id,
+                        createdAt: createdAt,
+                        text: data.text || '',
+                        user: data.user,
+                        image: data.image || null,
+                        video: data.video || null,
+                    };
+                });
+                setMessages(fetchedMessages);
+            }
+        );
 
         return () => unsubscribe();
     }, []);
@@ -89,28 +90,47 @@ export default function Chat() {
         }
     }, []);
 
-    // Function to handle image picker
+
     const handleImagePicker = async () => {
         let result = await launchImageLibraryAsync({
             mediaTypes: 'Images',
             allowsEditing: true,
             aspect: [4, 3],
-            quality: 0.5,
+            quality: 0.3,
         });
 
-        if (!result.cancelled) {
-            const imageMessage = {
-                _id: Math.random().toString(36).substring(7),
-                createdAt: new Date(),
-                user: {
-                    _id: auth.currentUser.email,
-                    avatar: auth.currentUser.photoURL || 'https://picsum.photos/id/237/200/300',
-                },
-                image: result.uri,
-            };
-            handleSend([imageMessage]);
+        console.log('Image picker result:', result); // Log the entire result object
+
+        if (result.cancelled) {
+            console.log('Image picker canceled');
+            return; // Exit the function if the picker was canceled
+        }
+
+        // Proceed with handling the selected image if the URI is defined
+        if (result?.assets?.length > 0 && result.assets[0].uri) {
+            const imageUri = result.assets[0].uri;
+            try {
+                const fileName = imageUri.split('/').pop(); // Extract file name from the URI
+                const downloadUrl = await uploadImageToFirebase(imageUri, fileName);
+                console.log('Download URL:', downloadUrl); // Log the download URL
+                const imageMessage = {
+                    _id: Math.random().toString(36).substring(7),
+                    createdAt: new Date(),
+                    user: {
+                        _id: auth.currentUser.email,
+                        avatar: auth.currentUser.photoURL || 'https://picsum.photos/id/237/200/300',
+                    },
+                    image: downloadUrl,
+                };
+                handleSend([imageMessage]);
+            } catch (error) {
+                console.error('Error uploading image to Firebase Storage: ', error);
+            }
+        } else {
+            console.error('Image URI is undefined');
         }
     };
+
 
     // Function to handle video picker
     const handleVideoPicker = async () => {
@@ -148,7 +168,6 @@ export default function Chat() {
         }
         return null;
     };
-
 
     // Function to render video messages
     const renderMessageVideo = (props) => {

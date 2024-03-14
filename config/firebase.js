@@ -21,28 +21,35 @@ export const auth = getAuth(app); // Define and export auth variable
 export const database = getFirestore(app);
 export const storage = getStorage(app);
 
-
-// Function to upload image to Firebase Storage
 export const uploadImageToFirebase = async (uri, fileName) => {
-    const imageRef = ref(storage, `images/${fileName}`);
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const uploadTask = uploadBytesResumable(imageRef, blob);
+    console.log('Uploading image with URI:', uri);
+    console.log('File name:', fileName);
 
-    return new Promise((resolve, reject) => {
-        uploadTask.on(
-            "state_changed",
-            null,
-            (error) => {
-                reject(error);
-            },
-            async () => {
-                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(downloadUrl);
-            }
-        );
-    });
+    const imageRef = ref(storage, `images/${fileName}`);
+
+    try {
+        // Fetch the image data and convert it to blob
+        const response = await fetch(uri);
+        const blob = await response.blob();
+
+        console.log('Blob:', blob); // Log the blob
+
+        // Log blob size
+        console.log('Blob size:', blob.size);
+        console.log('Expected file size:', 1060192); // Log the expected file size
+
+        const uploadTaskSnapshot = await uploadBytesResumable(imageRef, blob);
+        const downloadUrl = await getDownloadURL(uploadTaskSnapshot.ref);
+        return downloadUrl;
+    } catch (error) {
+        console.error('Error uploading image to Firebase Storage: ', error);
+        throw error;
+    }
 };
+
+
+
+
 
 
 // Function to add a new document to Firestore collection
